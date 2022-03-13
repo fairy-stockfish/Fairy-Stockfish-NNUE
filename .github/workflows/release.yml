@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, windows-2022]
+        arch: ["x86-64-bmi2", "x86-64-modern", "x86-64"]
+        include:
+          - os: ubuntu-20.04
+            comp: gcc
+            extension:
+          - os: windows-2022
+            comp: mingw
+            extension: .exe
+
+    runs-on: ${{ matrix.os }}
+    env:
+      COMP: ${{ matrix.comp }}
+      ARCH: ${{ matrix.arch }}
+      EXE: fairy-stockfish_${{ matrix.arch }}${{ matrix.extension }}
+      largeboards: ${{ startsWith(github.ref_name, 'makruk') && 'no' || 'yes' }}
+      TAG: ${{ github.ref_name }}
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'true'
+
+      - name: Determine NNUE network
+        run: |
+          echo "VARIANT=$(echo "${TAG%%-*}")" >> $GITHUB_ENV
+          echo "NNUE_NET=$(ls | grep "^${TAG%%-*}-.*\.nnue")" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Copy NNUE
+        run: cp $NNUE_NET Fairy-Stockfish/src/
+        shell: bash
+
+      - name: Update code
+        run: sed -i "s/nn-[a-z0-9]\{12\}.nnue/$NNUE_NET/" Fairy-Stockfish/src/evaluate.h
+        shell: bash
+
+      - name: make
+        run: cd Fairy-Stockfish/src && make clean EXE=$EXE && make -j build EXE=$EXE largeboards=$largeboards nnue=yes load_net= && strip $EXE
+        shell: bash
+
+      - name: Upload release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: Fairy-Stockfish/src/${{ env.EXE }}
+          tag: ${{ github.ref }}
+          body: "Release for variant ${{ env.VARIANT }} with built-in NNUE network ${{ env.NNUE_NET }}"
