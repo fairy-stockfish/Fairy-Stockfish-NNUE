@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-24.04, windows-2022]
-        arch: ["x86-64-bmi2", "x86-64-modern", "x86-64"]
+        arch: ["x86-64-bmi2", "x86-64-modern", "x86-64", "x86-64-avx2", "x86-64-avx512", "x86-64-vnni256"]
         include:
           - os: ubuntu-20.04
             comp: gcc
